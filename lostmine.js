@@ -1,26 +1,35 @@
 
 var jgl;
 
-var g = {
-    KEYS: {LEFT: 37, RIGHT: 39, UP: 38, DOWN: 40, SPACE: 32 },
-    keyState: [],
-    canvas: null,
-    context: null,
-    walking: false,
-    minerX: 0,
-    minerY: 0,
-    moveX: 0,
-    moveY: 0,
-    pendingX: 0,
-    pendingY: 0,
-    moveCounter: 31
-};
+var KEYS = {LEFT: 37, RIGHT: 39, UP: 38, DOWN: 40, SPACE: 32 };
+var keyState = [];
+var spriteLayerCanvas;
+var spriteLayerContext;
+var backLayerCanvas;
+var backLayerContext;
+var foreLayerCanvas;
+var foreLayerContext;
+var walking = false;
+var minerX = 320;
+var minerY = 40;
+var moveX = 0;
+var moveY = 0;
+var pendingX = 0;
+var pendingY = 0;
+var moveCounter = 31;
+var map = [];
+var tiles = [];
 
+//***********************************************
 var init = function () {
+    var i;
 
-    g.canvas = document.getElementById("canvas");
-    g.context = g.canvas.getContext("2d");
-    g.context.font = "24px _sans";
+    // Initialize the amazing JGL and create a new sprite list
+    jgl = new Jgl;
+
+    initLayers();
+
+    //spriteLayerContext.font = "24px _sans";
 
     document.addEventListener("keydown", processKeyDown);
     document.addEventListener("keyup", processKeyUp);
@@ -29,51 +38,51 @@ var init = function () {
         console.log("KEY: "+ev.keyCode);
         var frame;
 
-        g.keyState[ev.keyCode] = true;
+        keyState[ev.keyCode] = true;
         switch (ev.keyCode) {
             case 88:
             {
-                //g.explSprite.animate = true;
-                g.explSprite.setAnimActions(true);
-                g.explSprite.setPosition(jgl.random(500) + 100, jgl.random(200) + 100);
-                g.explSprite.setCurrentFrame(0);
-                g.explSprite.show();
+                //explSprite.animate = true;
+                explSprite.setAnimActions(true);
+                explSprite.setPosition(jgl.random(500) + 100, jgl.random(200) + 100);
+                explSprite.setCurrentFrame(0);
+                explSprite.show();
                 break;
             }
 
             case 39:    // RIGHT
-                g.walking = true;
-                g.pendingX = 1;
-                g.pendingY = 0;
+                walking = true;
+                pendingX = 1;
+                pendingY = 0;
                 break;
 
             case 37:    // LEFT
-                g.walking = true;
-                g.pendingX = -1;
-                g.pendingY = 0;
+                walking = true;
+                pendingX = -1;
+                pendingY = 0;
                 break;
 
             case 38:    // UP
-                g.walking = true;
-                g.pendingX = 0;
-                g.pendingY = -1;
+                walking = true;
+                pendingX = 0;
+                pendingY = -1;
                 break;
 
             case 40:    // DOWN
-                g.walking = true;
-                g.pendingX = 0;
-                g.pendingY = 1;
+                walking = true;
+                pendingX = 0;
+                pendingY = 1;
                 break;
 
             case  83:   // S
-                g.pendingX = 0;
-                g.pendingY = 0;
+                pendingX = 0;
+                pendingY = 0;
                 break;
         }
     }
 
     function processKeyUp(ev) {
-        g.keyState[ev.keyCode] = false;
+        keyState[ev.keyCode] = false;
         switch (ev.keyCode)
         {
         }
@@ -87,18 +96,13 @@ var init = function () {
 //***********************************************
 initSprites = function() {
     var frame;
-    // Initialize the amazing JGL and create a new sprite list
-    jgl = new Jgl;
-    g.spriteList = jgl.newSpriteList();
+    spriteList = jgl.newSpriteList();
 
-    g.imageMap = new Image();
-    g.imageMap.src = "./images/miner.png";
-    g.explosionImg = new Image();
-    g.explosionImg.src = "./images/explosion.png";
+    // MINER sprite
 
-    g.miner = g.spriteList.newSprite({id: 'miner',
+    miner = spriteList.newSprite({id: 'miner',
         width: 32, height: 32,
-        x: g.minerX, y: g.minerY,
+        x: minerX, y: minerY,
         animate: false,
         animationSpeed: 10,
         autoLoop: true,
@@ -107,6 +111,7 @@ initSprites = function() {
         active: true
     });
 
+    // Frame Numbers
     STAND_DOWN = 0;
     WALK_DOWN_START = 1;
     WALK_DOWN_END = 2;
@@ -118,28 +123,28 @@ initSprites = function() {
     WALK_LEFT_END = 7;
     STAND_RIGHT = 8;
     WALK_RIGHT_START = 8;
-    WALK_RIGHT_END = 9
+    WALK_RIGHT_END = 9;
     DEAD_LEFT = 10;
     DEAD_RIGHT = 11;
 
-    g.miner.setAnimFrame(STAND_DOWN, g.imageMap, 0, 0, 32, 32);    // Standing still
-    g.miner.setAnimFrame(WALK_DOWN_START, g.imageMap, 0, 32, 32, 32);    // walking
-    g.miner.setAnimFrame(WALK_DOWN_END, g.imageMap, 0, 64, 32, 32);    // walking
-    g.miner.setAnimFrame(STAND_UP, g.imageMap, 32, 0, 32, 32);    // Standing still, facing away
-    g.miner.setAnimFrame(WALK_UP_START, g.imageMap, 32, 32, 32, 32);    // walking away
-    g.miner.setAnimFrame(WALK_UP_END, g.imageMap, 32, 64, 32, 32);    // walking away
-    g.miner.setAnimFrame(STAND_LEFT, g.imageMap, 64, 0, 32, 32);    // standing left
-    g.miner.setAnimFrame(WALK_LEFT_END, g.imageMap, 96, 0, 32, 32);    // walking left
-    g.miner.setAnimFrame(STAND_RIGHT, g.imageMap, 64, 32, 32, 32);    // standing right
-    g.miner.setAnimFrame(WALK_RIGHT_END, g.imageMap, 96, 32, 32, 32);    // walking right
-    g.miner.setAnimFrame(DEAD_LEFT, g.imageMap, 128, 32, 32, 32);    // dead left
-    g.miner.setAnimFrame(DEAD_RIGHT, g.imageMap, 128, 0, 32, 32);    // dead right
+    miner.setAnimFrame(STAND_DOWN, imageMap, 0, 0, 32, 32);    // Standing still
+    miner.setAnimFrame(WALK_DOWN_START, imageMap, 0, 32, 32, 32);    // walking
+    miner.setAnimFrame(WALK_DOWN_END, imageMap, 0, 64, 32, 32);    // walking
+    miner.setAnimFrame(STAND_UP, imageMap, 32, 0, 32, 32);    // Standing still, facing away
+    miner.setAnimFrame(WALK_UP_START, imageMap, 32, 32, 32, 32);    // walking away
+    miner.setAnimFrame(WALK_UP_END, imageMap, 32, 64, 32, 32);    // walking away
+    miner.setAnimFrame(STAND_LEFT, imageMap, 64, 0, 32, 32);    // standing left
+    miner.setAnimFrame(WALK_LEFT_END, imageMap, 96, 0, 32, 32);    // walking left
+    miner.setAnimFrame(STAND_RIGHT, imageMap, 64, 32, 32, 32);    // standing right
+    miner.setAnimFrame(WALK_RIGHT_END, imageMap, 96, 32, 32, 32);    // walking right
+    miner.setAnimFrame(DEAD_LEFT, imageMap, 128, 32, 32, 32);    // dead left
+    miner.setAnimFrame(DEAD_RIGHT, imageMap, 128, 0, 32, 32);    // dead right
 
-    // Create an EXPLOSION sprite that has multiple frames
-    g.explSprite = g.spriteList.newSprite({
+    // EXPLOSION sprite
+    explSprite = spriteList.newSprite({
         id: 'explosion',
         width: 88, height: 90,
-        image: g.explosionImg,
+        image: explosionImg,
         animate: true,
         autoLoop: false,
         autoDeactivate: true,
@@ -151,86 +156,157 @@ initSprites = function() {
 
     // Define animation frames
     for (frame = 0; frame < 40; frame++) {
-        g.explSprite.setAnimFrame(frame, g.explosionImg, frame * 88, 0, 88, 90);
+        explSprite.setAnimFrame(frame, explosionImg, frame * 88, 0, 88, 90);
     }
-    g.explSprite.setHotSpot(44, 44);
+    explSprite.setHotSpot(44, 44);
+};
+
+//***********************************************
+var initLayers = function() {
+    var i, x, y;
+
+    explosionImg = jgl.newImage("./images/explosion.png");
+
+    backLayerCanvas = document.getElementById("backLayer");
+    backLayerContext = backLayerCanvas.getContext("2d");
+    backLayerContext.fillStyle = "#410";
+    backLayerContext.fillRect(0, 0, 640, 360);
+    jgl.newImage('./images/hills.jpg', function(image) {
+        backLayerContext.drawImage(image, 0, 0, 640, 83, 0, 0, 640, 83);
+    });
+
+    imageMap = jgl.newImage("./images/miner.png", function() {
+        var SURFACE = 0;
+        var DIRT = 1;
+        var ROCK = 2;
+        var SILVER_LG = 3;
+        var SILVER_SM = 4;
+        var ROCKS = 5;
+        var GOLD_MD = 6;
+        var GOLD_SM = 7;
+        var GOLD_LG = 8;
+
+        tiles = [{x:96, y:128},{x:0, y:96},{x:32, y:96},{x:64, y:96},{x:96, y:96},{x:128, y:96},{x:0, y:128},{x:32, y:128},{x:64, y:128}];
+        map.push([SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE,SURFACE]);
+        for (i = 0; i < 8; i++) {
+            var row = [DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT,DIRT];
+            map.push(row);
+        }
+        // Scatter treasure
+        var treasures = jgl.random(20) + 1;
+        for (i = 0; i < treasures; i++) {
+            var x = jgl.random(20);
+            var y = jgl.random(8) + 1;
+            map[y][x] = jgl.random(6) + 3;
+        }
+        // Scatter rocks
+        for (i = 0; i < 25; i++) {
+            var x = jgl.random(20);
+            var y = jgl.random(8) + 1;
+            map[y][x] = ROCKS;
+        }
+        for (i = 0; i < 25; i++) {
+            var x = jgl.random(20);
+            var y = jgl.random(8) + 1;
+            map[y][x] = ROCK;
+        }
+        // Draw the map
+        for (x = 0; x < 20; x++) {
+            for (y = 0; y < 9; y++) {
+                var t = map[y][x];
+                var tc = tiles[t];
+                backLayerContext.drawImage(imageMap, tc.x, tc.y, 32, 32, x*32, 72+(y*32), 32, 32);
+            }
+        }
+
+    });
+
+    spriteLayerCanvas = document.getElementById("spriteLayer");
+    spriteLayerContext = spriteLayerCanvas.getContext("2d");
+    spriteLayerContext.clearRect(0, 0, 640, 360);
+
+    /*
+     foreLayerCanvas = document.getElementById("foreLayer");
+     foreLayerContext = foreLayerCanvas.getContext("2d");
+
+     foreLayerContext.clearRect(0, 0, 640, 360);
+    jgl.newImage('./images/frame.png', function(image) {
+        foreLayerContext.drawImage(image, 0, 0, 640, 360, 0, 0, 640, 360);
+    });
+    */
 };
 
 //***********************************************
 var animate = function(){
     // request new frame
     requestAnimFrame(function(){ animate(); });
-
-    g.context.fillStyle = "#FED";
-    g.context.fillRect(0, 0, 640, 360);
-
-    animateMiner();
-
-    g.spriteList.drawSprites(g.context);
+    spriteLayerContext.clearRect(0, 0, 640, 360);
+    updateMiner();
+    spriteList.drawSprites(spriteLayerContext);
 };
 
 //***********************************************
-var animateMiner = function(){
-    if (g.walking) {
-        if (++g.moveCounter >= 32) {
-            g.moveCounter = 0;
-            g.moveX = g.pendingX;
-            g.moveY = g.pendingY;
+var updateMiner = function(){
+    if (walking) {
+        if (++moveCounter >= 32) {
+            moveCounter = 0;
+            moveX = pendingX;
+            moveY = pendingY;
 
-            if (g.moveX > 0) {
-                g.miner.setFrameRange(WALK_RIGHT_START, WALK_RIGHT_END, WALK_RIGHT_END);
-            } else if (g.moveX < 0) {
-                g.miner.setFrameRange(WALK_LEFT_START, WALK_LEFT_END, WALK_LEFT_END);
-            } else if (g.moveY > 0) {
-                g.miner.setFrameRange(WALK_DOWN_START, WALK_DOWN_END, WALK_DOWN_END);
-            } else if (g.moveY < 0) {
-                g.miner.setFrameRange(WALK_UP_START, WALK_UP_END, WALK_UP_END);
+            if (moveX > 0) {
+                miner.setFrameRange(WALK_RIGHT_START, WALK_RIGHT_END, WALK_RIGHT_END);
+            } else if (moveX < 0) {
+                miner.setFrameRange(WALK_LEFT_START, WALK_LEFT_END, WALK_LEFT_END);
+            } else if (moveY > 0) {
+                miner.setFrameRange(WALK_DOWN_START, WALK_DOWN_END, WALK_DOWN_END);
+            } else if (moveY < 0) {
+                miner.setFrameRange(WALK_UP_START, WALK_UP_END, WALK_UP_END);
             }
-            g.miner.setAnimActions(true, true, false);
-            if (g.moveX == 0 && g.moveY == 0) {
+            miner.setAnimActions(true, true, false);
+            if (moveX == 0 && moveY == 0) {
                 stopWalking();
             }
         }
 
-        g.minerX += g.moveX;
-        g.minerY += g.moveY;
+        minerX += moveX;
+        minerY += moveY;
 
-        if (g.minerX > 608) {
-            g.minerX = 608;
+        if (minerX > 608) {
+            minerX = 608;
             stopWalking();
         }
-        if (g.minerY > 320) {
-            g.minerY = 320;
+        if (minerY > 320) {
+            minerY = 320;
             stopWalking();
         }
-        if (g.minerX < 0) {
-            g.minerX = 0;
+        if (minerX < 0) {
+            minerX = 0;
             stopWalking();
         }
-        if (g.minerY < 0) {
-            g.minerY = 0;
+        if (minerY < 40) {
+            minerY = 40;
             stopWalking();
         }
 
-        g.miner.setPosition(g.minerX, g.minerY);
+        miner.setPosition(minerX, minerY);
     }
 };
 
 //***********************************************
 var stopWalking = function() {
     var frame = STAND_DOWN;
-    if (g.walking) {
-        g.walking = false;
-        g.moveCounter = 31;
-        if (g.moveX > 0) { frame = STAND_RIGHT; }
-        if (g.moveX < 0) { frame = STAND_LEFT; }
-        if (g.moveY > 0) { frame = STAND_DOWN; }
-        if (g.moveY < 0) { frame = STAND_UP; }
-        g.miner.setAnimActions(false);
-        g.miner.setCurrentFrame(frame);
+    if (walking) {
+        walking = false;
+        moveCounter = 31;
+        if (moveX > 0) { frame = STAND_RIGHT; }
+        if (moveX < 0) { frame = STAND_LEFT; }
+        if (moveY > 0) { frame = STAND_DOWN; }
+        if (moveY < 0) { frame = STAND_UP; }
+        miner.setAnimActions(false);
+        miner.setCurrentFrame(frame);
     }
-    g.moveX = g.moveY = g.pendingX = g.pendingY = 0;
-    console.log("Miner Coordinates: (" + g.minerX + "," + g.minerY + ")");
+    moveX = moveY = pendingX = pendingY = 0;
+    console.log("Miner Coordinates: (" + minerX + "," + minerY + ")");
 };
 
 window.addEventListener("load", init, false);
