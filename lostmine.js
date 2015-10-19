@@ -80,35 +80,23 @@ var init = function () {
                 break;
 
             case KEYS.RIGHT:
-                if (canWalk('RIGHT', minerRow, minerCol + 1)) {
-                    walking = true;
-                    pendingX = 1;
-                    pendingY = 0;
-                }
+                pendingX = 1;
+                pendingY = 0;
                 break;
 
             case KEYS.LEFT:
-                if (canWalk('LEFT', minerRow, minerCol - 1)) {
-                    walking = true;
-                    pendingX = -1;
-                    pendingY = 0;
-                }
+                pendingX = -1;
+                pendingY = 0;
                 break;
 
             case KEYS.UP:
-                if (canWalk('UP', minerRow - 1, minerCol)) {
-                    walking = true;
-                    pendingX = 0;
-                    pendingY = -1;
-                }
+                pendingX = 0;
+                pendingY = -1;
                 break;
 
             case KEYS.DOWN:
-                if (canWalk('DOWN', minerRow + 1, minerCol)) {
-                    walking = true;
-                    pendingX = 0;
-                    pendingY = 1;
-                }
+                pendingX = 0;
+                pendingY = 1;
                 break;
         }
     }
@@ -154,11 +142,8 @@ initSprites = function() {
     miner.setAnimFrame(DEAD_RIGHT, imageMap, 128, 0, 32, 32);    // dead right
 
     // DYNAMITE sprite
-    dynamiteSprite = spriteList.newSprite({id: 'dynamite',
-        width: 32, height: 32,
-        active: false
-    });
-    dynamiteSprite.setImage(imageMap, 128, 128, 32, 32);
+    dynamiteSprite = spriteList.newSprite({id: 'dynamite', width: 32, height: 32, active: false });
+    dynamiteSprite.setImage(imageMap, 128, 64, 32, 32);
 
     // EXPLOSION sprite
     explSprite = spriteList.newSprite({
@@ -251,6 +236,14 @@ var populateMine = function() {
         y = jgl.random(8) + 2;
         tileMap[y][x] = ROCK;
     }
+
+    // Set all tiles below ground element to be hidden
+    var row, col, t, tc;
+    for (col = 0; col < 20; col++) {
+        for (row = 2; row < 10; row++) {
+            tileMap[row][col] = tileMap[row][col] + 100;
+        }
+    }
 };
 
 //***********************************************
@@ -259,17 +252,59 @@ var drawMine = function() {
     for (col = 0; col < 20; col++) {
         for (row = 0; row < 10; row++) {
             t = tileMap[row][col];
-            if (t !== NOTHING && t !== DUGOUT) {
-                tc = tileCoords[t];
-                backLayerContext.drawImage(imageMap, tc.x, tc.y, 32, 32, col*32, 40+(row*32), 32, 32);
+            if (t >= 99) { // it's currently hidden
+                backLayerContext.drawImage(imageMap, 128, 128, 32, 32, col*32, 40+(row*32), 32, 32);
+            } else {
+                if (t !== NOTHING && t !== DUGOUT) {
+                    tc = tileCoords[t];
+                    backLayerContext.drawImage(imageMap, tc.x, tc.y, 32, 32, col*32, 40+(row*32), 32, 32);
+                }
             }
         }
     }
 };
 
 //***********************************************
-var canWalk = function(dir, row, col) {
-    if (row < 0 || row > 8) { return false; }       // off-screen
+var revealTiles = function (minerRow, minerCol) {
+    revealTile(minerRow+1, minerCol);
+    revealTile(minerRow-1, minerCol);
+    revealTile(minerRow, minerCol+1);
+    revealTile(minerRow, minerCol-1);
+};
+
+//***********************************************
+var revealTile = function(row, col) {
+    if (row < 0 || row > 9 || col < 0 || col > 19) { return };
+
+    t = tileMap[row][col];
+    if (t >= 99) { // it's currently hidden
+        t -= 100;  // not hidden flag
+    }
+    tileMap[row][col] = t;
+    if (t !== NOTHING && t !== DUGOUT) {
+        drawTile(t, row, col);
+    }
+};
+
+//***********************************************
+var drawTile = function(t, row, col) {
+    if (row < 1 || row > 9 || col < 0 || col > 19) { return };
+
+    tileMap[row][col] = t;
+    if (t == DUGOUT) {
+        backLayerContext.fillStyle = "#200";
+        backLayerContext.fillRect(col*32, 40+(row*32), 32, 32);
+    } else {
+        if (t !== NOTHING && t < tileCoords.length) {
+            var tc = tileCoords[t];
+            backLayerContext.drawImage(imageMap, tc.x, tc.y, 32, 32, col*32, 40+(row*32), 32, 32);
+        }
+    }
+};
+
+//***********************************************
+var canWalk = function(row, col) {
+    if (row < 0 || row > 9) { return false; }       // off-screen
     if (col < 0 || col > 19) { return false; }      // off-screen
 
     var t = tileMap[row][col];
@@ -285,18 +320,43 @@ var dropDynamite = function(row, col) {
         var y = 40 + row * 32;
         dynamiteSprite.setPosition(x, y);
         dynamiteSprite.show();
-        setTimeout(function() { detonateDynamite(x + 16, y + 16); }, 2000);
+        setTimeout(function() { detonateDynamite(row, col); }, 2000);
     }
 };
 
 //***********************************************
-var detonateDynamite = function(x, y) {
+var detonateDynamite = function(row, col) {
+    var x = col * 32 + 16;
+    var y = 40 + row * 32 + 16;
     dynamiteDropped = false;
     dynamiteSprite.hide();
     explSprite.setAnimActions(true);
     explSprite.setPosition(x, y);
     explSprite.setCurrentFrame(0);
+    explSprite.setAnimFrameCallback(10, function() { dynamiteAftermath(row, col); });
     explSprite.show();
+};
+
+//***********************************************
+var dynamiteAftermath = function(row, col) {
+    console.log("Dynamite exploded at "+row+","+col);
+    drawTile(DUGOUT, row - 1, col);
+    drawTile(DUGOUT, row, col - 1);
+    drawTile(DUGOUT, row, col);
+    drawTile(DUGOUT, row, col + 1);
+    drawTile(DUGOUT, row + 1, col);
+    if ((Math.abs(minerX - col) < 2 && minerY == row) || (Math.abs(minerY - row) < 2 && minerX == col)) {
+        // in the blast path
+        die(row, col);
+    }
+};
+
+//***********************************************
+var die = function(row, col) {
+    console.log("Miner is dead!");
+    walking = false;
+    miner.setAnimActions(false);
+    miner.setCurrentFrame(DEAD_LEFT);
 };
 
 //***********************************************
@@ -310,11 +370,30 @@ var animate = function(){
 
 //***********************************************
 var updateMiner = function(){
-    if (walking) {
+    if (walking || pendingX || pendingY) {
         if (++moveCounter >= 32) {
             moveCounter = 0;
-            moveX = pendingX;
-            moveY = pendingY;
+            moveX = moveY = 0;
+            minerCol = parseInt(minerX / 32);
+            minerRow = parseInt((minerY - 40) / 32);
+            if (pendingX || pendingY) {
+                if (pendingX > 0 && canWalk(minerRow, minerCol + 1)) {
+                    walking = true;
+                    moveX = 1;
+                }
+                if (pendingX < 0 && canWalk(minerRow, minerCol - 1)) {
+                    walking = true;
+                    moveX = -1;
+                }
+                if (pendingY < 0 && canWalk(minerRow - 1, minerCol)) {
+                    walking = true;
+                    moveY = -1;
+                }
+                if (pendingY > 0 && canWalk(minerRow + 1, minerCol)) {
+                    walking = true;
+                    moveY = 1;
+                }
+            }
             pendingX = pendingY = 0;
 
             if (moveX > 0) {
@@ -326,8 +405,16 @@ var updateMiner = function(){
             } else if (moveY < 0) {
                 miner.setFrameRange(WALK_UP_START, WALK_UP_END, WALK_UP_END);
             }
-            miner.setAnimActions(true, true, false);
-            if (moveX == 0 && moveY == 0) {
+
+            minerCol = parseInt(minerX / 32);
+            minerRow = parseInt((minerY - 40) / 32);
+            tileMap[minerRow][minerCol] = DUGOUT;
+            revealTiles(minerRow, minerCol);
+            console.log("MINER: " + minerRow + ',' + minerCol);
+
+            if (moveX || moveY) {
+                miner.setAnimActions(true, true, false);
+            } else {
                 stopWalking();
             }
         }
@@ -335,30 +422,15 @@ var updateMiner = function(){
         minerX += moveX;
         minerY += moveY;
 
-        if (minerX > 608) {
-            minerX = 608;
-            stopWalking();
-        }
-        if (minerY > 320) {
-            minerY = 320;
-            stopWalking();
-        }
-        if (minerX < 0) {
-            minerX = 0;
-            stopWalking();
-        }
-        if (minerY < 40) {
-            minerY = 40;
-            stopWalking();
-        }
-
         miner.setPosition(minerX, minerY);
         if (minerY > 71) {
             backLayerContext.beginPath();
-            backLayerContext.arc(minerX + 16,minerY + 16,16,0,2*Math.PI);
+            backLayerContext.arc(minerX + 16, minerY + 16, 16, 0, 2 * Math.PI);
             backLayerContext.fillStyle = "#200";
             backLayerContext.fill();
         }
+    } else {
+        moveCounter = 31;
     }
 };
 
@@ -372,10 +444,6 @@ var stopWalking = function() {
         if (moveX < 0) { frame = STAND_LEFT; }
         if (moveY > 0) { frame = STAND_DOWN; }
         if (moveY < 0) { frame = STAND_UP; }
-        minerCol = parseInt(minerX / 32);
-        minerRow = parseInt((minerY - 40) / 32);
-        tileMap[minerRow][minerCol] = DUGOUT;
-        console.log("MINER: "+minerRow+','+minerCol);
         miner.setAnimActions(false);
         miner.setCurrentFrame(frame);
     }
